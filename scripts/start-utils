@@ -113,7 +113,7 @@ function normalizeMemSize() {
 
 function versionLessThan() {
   local activeParts
-  IFS=. read -ra activeParts <<<"${VANILLA_VERSION}"
+  IFS=. read -ra activeParts <<<"${VANILLA_VERSION%%-*}"
 
   local givenParts
   IFS=. read -ra givenParts <<<"$1"
@@ -179,4 +179,12 @@ function removeOldMods {
   if [ -d "$1" ]; then
     find "$1" -mindepth 1 -maxdepth ${REMOVE_OLD_MODS_DEPTH:-16} -wholename "${REMOVE_OLD_MODS_INCLUDE:-*}" -not -wholename "${REMOVE_OLD_MODS_EXCLUDE:-}" -delete
   fi
+}
+
+function get() {
+  local flags=()
+  if isTrue "${DEBUG_GET:-false}"; then
+    flags+=("--debug")
+  fi
+  mc-image-helper "${flags[@]}" get "$@"
 }

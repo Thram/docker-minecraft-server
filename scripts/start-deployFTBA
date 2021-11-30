@@ -16,7 +16,7 @@ if ! [[ ${FTB_MODPACK_ID} =~ [0-9]+ ]]; then
   exit 1
 fi
 
-if ! [[ -v FTB_MODPACK_VERSION_ID ]]; then
+if [[ ! $FTB_MODPACK_VERSION_ID ]]; then
   if ! FTB_MODPACK_VERSION_ID=$(curl -fsSL https://api.modpacks.ch/public/modpack/${FTB_MODPACK_ID} | jq -r '.versions | sort_by(.updated)[-1].id'); then
     log "ERROR unable to resolve latest modpack version ID for modpack ${FTB_MODPACK_ID}"
     exit 1
@@ -67,7 +67,7 @@ variants=(
   forge-${mcVersion}-${forgeVersion}-${mcVersion}-universal.jar
   fabric-${mcVersion}-${fabricVersion}-server-launch.jar
 )
-for f in ${variants[@]}; do
+for f in "${variants[@]}"; do
   if [ -f $f ]; then
     export SERVER=$f
     break

@@ -2,13 +2,16 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# shellcheck source=start-utils
 . ${SCRIPTS:-/}start-utils
 
-: ${EULA:=}
-: ${PROXY:=}
-: ${RCON_PASSWORD_FILE:=}
+: "${EULA:=}"
+: "${PROXY:=}"
+: "${RCON_PASSWORD_FILE:=}"
 
 shopt -s nullglob
+
+isDebugging && set -x
 
 #umask 002
 export HOME=/data
@@ -63,10 +66,16 @@ export VERSIONS_JSON=https://launchermeta.mojang.com/mc/game/version_manifest.js
 
 case "X$VERSION" in
   X|XLATEST|Xlatest)
-    VANILLA_VERSION=$(curl -fsSL $VERSIONS_JSON | jq -r '.latest.release')
+    if ! VANILLA_VERSION=$(get --json-path '$.latest.release' "$VERSIONS_JSON"); then
+      log "ERROR: version lookup failed: $VANILLA_VERSION"
+      exit 1
+    fi
   ;;
   XSNAPSHOT|Xsnapshot)
-    VANILLA_VERSION=$(curl -fsSL $VERSIONS_JSON | jq -r '.latest.snapshot')
+    if ! VANILLA_VERSION=$(get --json-path '$.latest.snapshot' "$VERSIONS_JSON"); then
+      log "ERROR: version lookup failed: $VANILLA_VERSION"
+      exit 1
+    fi
   ;;
   *)
     VANILLA_VERSION=$VERSION
@@ -81,6 +90,14 @@ export ORIGINAL_TYPE=${TYPE^^}
 
 if isTrue "${ENABLE_AUTOPAUSE}"; then
   ${SCRIPTS:-/}start-autopause
+fi
+
+if versionLessThan 1.7; then
+  echo "
+MC_HEALTH_EXTRA_ARGS=(
+  --use-server-list-ping
+)
+  " > /data/.mc-health.env
 fi
 
 log "Resolving type given ${TYPE}"
@@ -115,16 +132,14 @@ case "${TYPE^^}" in
 
   FTB|CURSEFORGE)
     log "**********************************************************************"
-    log "WARNING: The image tag itzg/minecraft-server:java8 is recommended"
-    log "         since some mods require Java 8"
-    log "         Exception traces reporting ClassCastException: class jdk.internal.loader.ClassLoaders\$AppClassLoader"
-    log "         can be fixed with java8"
+    log "NOTE: Some mods and modpacks may require Java 8."
+    log "      If so, use itzg/minecraft-server:java8"
     log "**********************************************************************"
     exec ${SCRIPTS:-/}start-deployCF "$@"
   ;;
 
   VANILLA)
-    exec ${SCRIPTS:-/}start-deployVanilla "$@"
+    exec "${SCRIPTS:-/}start-deployVanilla" "$@"
   ;;
 
   SPONGEVANILLA)
@@ -133,10 +148,6 @@ case "${TYPE^^}" in
 
   CUSTOM)
     exec ${SCRIPTS:-/}start-deployCustom "$@"
-  ;;
-
-  CURSE_INSTANCE)
-    exec ${SCRIPTS:-/}start-validateCurseInstance "$@"
   ;;
 
   MAGMA)
@@ -167,11 +178,21 @@ case "${TYPE^^}" in
     exec ${SCRIPTS:-/}start-deployLimbo "$@"
   ;;
 
+  CRUCIBLE)
+    log "**********************************************************************"
+    log "WARNING: The image tag itzg/minecraft-server:java8 is recommended"
+    log "         since some mods require Java 8"
+    log "         Exception traces reporting ClassCastException: class jdk.internal.loader.ClassLoaders\$AppClassLoader"
+    log "         can be fixed with java8"
+    log "**********************************************************************"
+    exec "${SCRIPTS:-/}start-deployCrucible" "$@"
+  ;;
+
   *)
       log "Invalid type: '$TYPE'"
       log "Must be: VANILLA, FORGE, BUKKIT, SPIGOT, PAPER, FTBA (multiarch-only),"
-      log "         CURSE_INSTANCE, CURSEFORGE, SPONGEVANILLA, PURPUR, CUSTOM,"
-      log "         MAGMA, MOHIST, CATSERVER, AIRPLANE, CANYON, LIMBO"
+      log "         CURSEFORGE, SPONGEVANILLA, PURPUR, CUSTOM,"
+      log "         MAGMA, MOHIST, CATSERVER, AIRPLANE, CANYON, LIMBO, CRUCIBLE"
       exit 1
   ;;
 
